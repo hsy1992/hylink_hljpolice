@@ -1,0 +1,40 @@
+apply plugin: 'com.android.library'
+// must be applied after your artifact generating plugin (eg. java / com.android.library)
+//apply plugin: 'com.novoda.bintray-release'
+apply plugin: 'com.github.dcendents.android-maven'
+android {
+
+    compileSdkVersion 28
+    buildToolsVersion '28.0.3'
+
+    defaultConfig {
+        minSdkVersion 19
+        targetSdkVersion 28
+        versionCode 1
+        versionName '0.0.1'
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+//api key 16e4099363839f8f3611b7b522d49fe4fbbc1095
+//./gradlew clean build bintrayUpload -PbintrayUser=haosiyuan -PbintrayKey=16e4099363839f8f3611b7b522d49fe4fbbc1095 -PdryRun=false
+//publish {
+//    userOrg = 'hylink' //bintray账户下某个组织id
+//    groupId = rootProject.ext.android.applicationId //maven仓库下库的包名，一般为模块包名
+//    artifactId = 'hljpolice' //项目名称
+//    publishVersion = "0.0.9" //版本号
+//    desc = '' //项目介绍，可以不写
+//    website = '' //项目主页，可以不写
+//}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'com.google.code.gson:gson:2.8.5'
+    implementation 'com.xdja.android:reckon:2.2.0'
+}
