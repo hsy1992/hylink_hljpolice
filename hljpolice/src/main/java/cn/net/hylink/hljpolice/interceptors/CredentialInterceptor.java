@@ -1,6 +1,7 @@
 package cn.net.hylink.hljpolice.interceptors;
 
 import android.text.TextUtils;
+import android.util.Log;
 
 import com.google.gson.Gson;
 
@@ -33,6 +34,8 @@ import okio.Buffer;
  */
 public class CredentialInterceptor implements Interceptor {
 
+    private static final String TAG = "CredentialInterceptor";
+
     private static final MediaType MEDIA_TYPE = MediaType.parse("application/json; charset=UTF-8");
 
     private static final Charset UTF_8 = Charset.forName("UTF-8");
@@ -58,11 +61,12 @@ public class CredentialInterceptor implements Interceptor {
                 CredentialUtil.getInstance().getConfigFileBean() != null &&
                 CredentialUtil.getInstance().getThisCredentialBean() != null
         ) {
-
+            Log.i(TAG, "寻址成功" + CredentialUtil.getInstance().getThisCredentialBean().getPackageName());
             //构建请求头 及参数
             AddressResponseBean addressResponseBean = findUrlFromResource(request.url().encodedPath());
 
             if (addressResponseBean != null) {
+                Log.i(TAG, "addressResponseBean寻址成功" + addressResponseBean.getResourceAddress());
                 UrlConfigBean urlConfig = CredentialUtil.getInstance().getConfigFileBean().getUrlConfigBean();
                 CredentialBean credential = CredentialUtil.getInstance().getThisCredentialBean();
                 Request.Builder builder = request.newBuilder().url(addressResponseBean.getResourceAddress())
@@ -96,6 +100,8 @@ public class CredentialInterceptor implements Interceptor {
 
                 return response.newBuilder().code(500).build();
             }
+        } else {
+            Log.i(TAG, "寻址失败");
         }
 
         return chain.proceed(request);
