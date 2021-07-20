@@ -1,6 +1,9 @@
 package cn.net.hylink.hljpolice;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -14,7 +17,6 @@ import com.google.gson.reflect.TypeToken;
 import com.xdja.reckon.ReckonAgent;
 import com.xdja.reckon.function.StateListener;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +50,8 @@ public class CredentialUtil {
      */
     public static final String ADDRESS_URI = "content://com.ydjw.rsb.getResourceAddress";
 
+    private Uri uri = Uri.parse(CREDENTIAL_URI);
+
     private CredentialBean thisCredentialBean;
 
     /**
@@ -59,6 +63,10 @@ public class CredentialUtil {
     private AutoParseResource autoParseResource;
     private ConfigFileBean configFileBean;
     private Handler mainHandler = new Handler(Looper.getMainLooper());
+    private LoginReceiver loginReceiver;
+    private String messageId = UUID.randomUUID().toString();
+    private Bundle loginBundle;
+    private UrlConfigBean configBean;
 
     private static class Instance {
         private static CredentialUtil credentialUtil = new CredentialUtil();
@@ -79,6 +87,10 @@ public class CredentialUtil {
                 autoParseResource.parse(context.getApplicationContext(), gson, fileName);
             }
         });
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction("com.ydjw.ua.ACTION_LOGIN");
+        loginReceiver = new LoginReceiver();
+        context.registerReceiver(loginReceiver, intentFilter);
     }
 
     /**
@@ -88,60 +100,26 @@ public class CredentialUtil {
      * @return
      */
     public CredentialBean getCredential(UrlConfigBean configBean) {
-
+        Log.i(TAG, "getCredential:");
         if (thisCredentialBean != null) {
             return thisCredentialBean;
         }
+        this.configBean = configBean;
 
-        Uri uri = Uri.parse(CREDENTIAL_URI);
+        loginBundle = new Bundle();
+        loginBundle.putString("messageId", UUID.randomUUID().toString());
+        loginBundle.putString("version", configBean.getVersion());
+        loginBundle.putString("appId", configBean.getAppId());
+        loginBundle.putString("orgId", configBean.getOrgId());
+        loginBundle.putString("networkAreaCode", configBean.getNetworkAreaCode());
+        loginBundle.putString("packageName", configBean.getPackageName());
 
-        String messageId = UUID.randomUUID().toString();
-        Bundle bundle = new Bundle();
-        bundle.putString("messageId", messageId);
-        bundle.putString("version", configBean.getVersion());
-        bundle.putString("appId", configBean.getAppId());
-        bundle.putString("orgId", configBean.getOrgId());
-        bundle.putString("networkAreaCode", configBean.getNetworkAreaCode());
-        bundle.putString("packageName", configBean.getPackageName());
-
-        Bundle callBack = context.getContentResolver().call(uri, "", null, bundle);
-//        Bundle callBack = testData1();
-        if (callBack == null) {
-            toast("获取应用凭证失败");
-            return null;
+        Bundle callBack = context.getContentResolver().call(uri, "", null, loginBundle);
+        Log.i(TAG, "getCredential:" + callBack);
+        if (callBack != null) {
+            useCallback(callBack);
         }
-
-        String appCredential = callBack.getString("appCredential");
-        String userCredential = callBack.getString("userCredential");
-        String message = callBack.getString("message");
-        Log.d(TAG, "message---" + message);
-        if (messageId.equals(callBack.getString("messageId")) &&
-                !TextUtils.isEmpty(appCredential) && !TextUtils.isEmpty(userCredential)) {
-            Log.d(TAG, "appCredential---" + appCredential);
-            Log.d(TAG, "userCredential---" + userCredential);
-            CredentialBean returnCredentialBean = new CredentialBean();
-            returnCredentialBean.setAppCredential(appCredential);
-            returnCredentialBean.setUserCredential(userCredential);
-            returnCredentialBean.setPackageName(configBean.getPackageName());
-            returnCredentialBean.setVersion(configBean.getVersion());
-            thisCredentialBean = returnCredentialBean;
-
-            UserInfoDetailBean userInfoDetailBean = gson.fromJson(userCredential, UserInfoDetailBean.class);
-            ReckonAgent.getInstance(context)
-                    .config("20.20.1.40", "8090")
-                    .startAnalytics(userInfoDetailBean.getCredential().getLoad().getUserInfo().getUserId())
-                    .addStateListener(new StateListener() {
-                        @Override
-                        public void reportState(String state) {
-                            Log.e(">>>>", "reportState: " + state);
-                        }
-                    });
-            ReckonAgent.getInstance(context).stopAnalytics();
-            return returnCredentialBean;
-        } else {
-            toast("获取应用凭证失败");
-            return null;
-        }
+        return null;
     }
 
     /**
@@ -165,35 +143,49 @@ public class CredentialUtil {
 
         Bundle callBack = context.getContentResolver().call(uri, "", null, params);
 
-//        Bundle callBack = testData();
         if (callBack == null) {
-            toast("获取应用资源地址失败");
-            return null;
-        }
+            try {
+                Thread.sleep(1000L);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            getResourceAddressList(credentialBean);
+        } else {
 
-        if (messageId.equals(callBack.getString("messageId"))) {
+            if (messageId.equals(callBack.getString("messageId"))) {
 
-            String resourceList = callBack.getString("resourceList");
-            String message = callBack.getString("message");
-            Log.d(TAG, "message---" + message);
-            int resultCode = callBack.getInt("resultCode");
-            if (resultCode == 0) {
-                //寻址成功
-                addressMap = new HashMap<>();
+                String resourceList = callBack.getString("resourceList");
+                String message = callBack.getString("message");
+                Log.d(TAG, "message---" + message);
                 Log.d(TAG, "resourceList---" + resourceList);
-                List<AddressResponseBean> addressResponseBeanList = gson.fromJson(resourceList,
-                        new TypeToken<List<AddressResponseBean>>() {
-                        }.getType());
+                Log.d(TAG, "thread---" + Thread.currentThread().getName());
+                int resultCode = callBack.getInt("resultCode");
+                if (resultCode == 0) {
+                    //寻址成功
+                    addressMap = new HashMap<>();
+                    Log.d(TAG, "寻址成功 resourceList---" + resourceList);
+                    List<AddressResponseBean> addressResponseBeanList = gson.fromJson(resourceList,
+                            new TypeToken<List<AddressResponseBean>>() {
+                            }.getType());
 
-                for (AddressResponseBean addressResponseBean : addressResponseBeanList) {
-                    addressMap.put(addressResponseBean.getResourceId(), addressResponseBean);
+                    for (AddressResponseBean addressResponseBean : addressResponseBeanList) {
+                        addressMap.put(addressResponseBean.getResourceId(), addressResponseBean);
+                    }
+
+                    return addressMap;
+                } else {
+
+                    Log.d(TAG, "获取应用资源地址失败重试");
+                    try {
+                        Thread.sleep(1000L);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    getResourceAddressList(credentialBean);
                 }
-
-                return addressMap;
             }
         }
 
-        toast("获取应用资源地址失败");
         return null;
     }
 
@@ -214,27 +206,42 @@ public class CredentialUtil {
         return configFileBean;
     }
 
-    private Bundle testData() {
-        Bundle bundle = new Bundle();
-        List<AddressResponseBean> addressResponseBeanList = new ArrayList<>();
-        AddressResponseBean addressResponseBean = new AddressResponseBean();
-        addressResponseBean.setResourceAddress("http://192.168.39.2:8080/endless");
-        addressResponseBean.setResourceId("1");
-        addressResponseBean.setResourceRegionalismCode("123");
-        addressResponseBean.setResourceServiceType("123");
-        addressResponseBeanList.add(addressResponseBean);
-        bundle.putInt("resultCode", 0);
-        bundle.putString("resourceList", gson.toJson(addressResponseBeanList));
-        bundle.putString("messageId", "100002");
-        return bundle;
-    }
+    private void useCallback(Bundle callBack) {
+        String appCredential = callBack.getString("appCredential");
+        String userCredential = callBack.getString("userCredential");
+        String message = callBack.getString("message");
+        Log.d(TAG, "message---" + message);
+        Log.d(TAG, "appCredential---" + appCredential);
+        Log.d(TAG, "userCredential---" + userCredential);
+        if (!TextUtils.isEmpty(callBack.getString("messageId")) &&
+                !TextUtils.isEmpty(appCredential) && !TextUtils.isEmpty(userCredential)) {
+            Log.d(TAG, "appCredential---" + appCredential);
+            Log.d(TAG, "userCredential---" + userCredential);
+            CredentialBean returnCredentialBean = new CredentialBean();
+            returnCredentialBean.setAppCredential(appCredential);
+            returnCredentialBean.setUserCredential(userCredential);
+            returnCredentialBean.setPackageName(configBean.getPackageName());
+            returnCredentialBean.setVersion(configBean.getVersion());
+            thisCredentialBean = returnCredentialBean;
 
-    private Bundle testData1() {
-        Bundle bundle = new Bundle();
-        bundle.putString("messageId", "100001");
-        bundle.putString("appCredential", "appCredential");
-        bundle.putString("userCredential", "userCredential");
-        return bundle;
+            UserInfoDetailBean userInfoDetailBean = gson.fromJson(userCredential, UserInfoDetailBean.class);
+            ReckonAgent.getInstance(context)
+                    .config("20.20.1.40", "8090")
+                    .startAnalytics(userInfoDetailBean.getCredential().getLoad().getUserInfo().getUserId())
+                    .addStateListener(new StateListener() {
+                        @Override
+                        public void reportState(String state) {
+                            Log.e(">>>>", "reportState: " + state);
+                        }
+                    });
+            ReckonAgent.getInstance(context).stopAnalytics();
+
+            if (returnCredentialBean != null) {
+                getResourceAddressList(returnCredentialBean);
+            }
+        } else {
+            Log.d(TAG, "获取凭证失败重试:");
+        }
     }
 
     private void toast(final String message) {
@@ -244,5 +251,28 @@ public class CredentialUtil {
                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    class LoginReceiver extends BroadcastReceiver {
+
+        @Override
+        public void onReceive(final Context context, final Intent intent) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    Log.i(TAG, "action:" + intent.getAction());
+                    loginBundle.putString("messageId", UUID.randomUUID().toString());
+                    Bundle callBack = context.getContentResolver().call(uri, "", null, loginBundle);
+                    if (callBack == null) {
+                        //失败
+                        Log.i(TAG, "callBack == null:");
+                        getCredential(configBean);
+                        return;
+                    }
+
+                    useCallback(callBack);
+                }
+            }).start();
+        }
     }
 }

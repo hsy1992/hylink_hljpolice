@@ -26,10 +26,7 @@ class AutoParseResource {
             Toast.makeText(applicationContext, "获取配置文件失败", Toast.LENGTH_SHORT).show();
             return;
         }
-        CredentialBean credentialBean = CredentialUtil.getInstance().getCredential(configFileBean.getUrlConfigBean());
-        if (credentialBean != null) {
-            CredentialUtil.getInstance().getResourceAddressList(credentialBean);
-        }
+        CredentialUtil.getInstance().getCredential(configFileBean.getUrlConfigBean());
 
     }
 
