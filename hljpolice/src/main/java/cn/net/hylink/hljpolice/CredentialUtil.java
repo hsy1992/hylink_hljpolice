@@ -67,6 +67,7 @@ public class CredentialUtil {
     private String messageId = UUID.randomUUID().toString();
     private Bundle loginBundle;
     private UrlConfigBean configBean;
+    private OnResourceListener onResourceListener;
 
     private static class Instance {
         private static CredentialUtil credentialUtil = new CredentialUtil();
@@ -77,6 +78,11 @@ public class CredentialUtil {
     }
 
     public void init(final Context context, final String fileName) {
+        init(context, fileName, null);
+    }
+
+    public void init(final Context context, final String fileName, OnResourceListener onResourceListener) {
+        this.onResourceListener = onResourceListener;
         this.context = context.getApplicationContext();
         gson = new Gson();
         //初始化去解析文件 自动配置应用凭证等
@@ -170,6 +176,10 @@ public class CredentialUtil {
 
                     for (AddressResponseBean addressResponseBean : addressResponseBeanList) {
                         addressMap.put(addressResponseBean.getResourceId(), addressResponseBean);
+                    }
+
+                    if (onResourceListener != null) {
+                        onResourceListener.onResourceSuccess();
                     }
 
                     return addressMap;
