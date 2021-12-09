@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -82,6 +83,7 @@ public class CredentialUtil {
     }
 
     public void init(final Context context, final String fileName, OnResourceListener onResourceListener) {
+        if (!checkApplication(context, "com.xdja.safeclient")) return;
         this.onResourceListener = onResourceListener;
         this.context = context.getApplicationContext();
         gson = new Gson();
@@ -285,4 +287,24 @@ public class CredentialUtil {
             }).start();
         }
     }
+
+    /**
+     * 判断该包名的应用是否安装
+     *
+     * @param context     上下文
+     * @param packageName 应用包名
+     * @return 是否安装
+     */
+    private boolean checkApplication(Context context, String packageName) {
+        if (packageName == null || "".equals(packageName)) {
+            return false;
+        }
+        try {
+            context.getPackageManager().getApplicationInfo(packageName, PackageManager.GET_UNINSTALLED_PACKAGES);
+            return true;
+        } catch (PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
+
 }
