@@ -10,4 +10,6 @@ package cn.net.hylink.hljpolice;
 public interface OnResourceListener {
 
     void onResourceSuccess();
+
+    void onResourceFail();
 }

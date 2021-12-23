@@ -82,8 +82,11 @@ public class CredentialUtil {
         init(context, fileName, null);
     }
 
-    public void init(final Context context, final String fileName, OnResourceListener onResourceListener) {
-        if (!checkApplication(context, "com.xdja.safeclient")) return;
+    public void init(final Context context, final String fileName, final OnResourceListener onResourceListener) {
+        if (!checkApplication(context, "com.xdja.safeclient")) {
+            if (onResourceListener != null) onResourceListener.onResourceFail();
+            return;
+        }
         this.onResourceListener = onResourceListener;
         this.context = context.getApplicationContext();
         gson = new Gson();
@@ -92,7 +95,7 @@ public class CredentialUtil {
         Executors.newSingleThreadExecutor().execute(new Runnable() {
             @Override
             public void run() {
-                autoParseResource.parse(context.getApplicationContext(), gson, fileName);
+                autoParseResource.parse(context.getApplicationContext(), gson, fileName, onResourceListener);
             }
         });
         IntentFilter intentFilter = new IntentFilter();
@@ -127,6 +130,7 @@ public class CredentialUtil {
         if (callBack != null) {
             useCallback(callBack);
         }
+        if (onResourceListener != null) onResourceListener.onResourceFail();
         return null;
     }
 
@@ -243,7 +247,7 @@ public class CredentialUtil {
                     .addStateListener(new StateListener() {
                         @Override
                         public void reportState(String state) {
-                            Log.e(">>>>", "reportState: " + state);
+                            Log.d(TAG, "reportState: " + state);
                         }
                     });
             ReckonAgent.getInstance(context).stopAnalytics();
@@ -253,6 +257,7 @@ public class CredentialUtil {
             }
         } else {
             Log.d(TAG, "获取凭证失败重试:");
+            if (onResourceListener != null) onResourceListener.onResourceFail();
         }
     }
 
